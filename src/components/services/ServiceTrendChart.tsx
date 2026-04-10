@@ -3,6 +3,7 @@ import type { ServiceHistoryPoint } from './types';
 interface ServiceTrendChartProps {
   history: ServiceHistoryPoint[];
   status: 'online' | 'offline' | 'unstable' | 'unknown';
+  variant?: 'card' | 'modal';
 }
 
 const getPointValue = (point: ServiceHistoryPoint) => {
@@ -34,17 +35,25 @@ const getChartPalette = (status: ServiceTrendChartProps['status']) => {
   }
 };
 
-export const ServiceTrendChart = ({ history, status }: ServiceTrendChartProps) => {
-  const width = 280;
-  const height = 92;
-  const padX = 8;
-  const padY = 8;
+export const ServiceTrendChart = ({ history, status, variant = 'card' }: ServiceTrendChartProps) => {
+  const isModal = variant === 'modal';
+  const width = isModal ? 760 : 280;
+  const height = isModal ? 168 : 92;
+  const padX = isModal ? 18 : 8;
+  const padY = isModal ? 16 : 8;
   const points = history.length > 1 ? history : [...history, ...history, ...history].slice(0, 3);
   const palette = getChartPalette(status);
+  const strokeWidth = isModal ? 5 : 3;
+  const pointRadius = isModal ? 6.5 : 4.5;
+  const pointGlow = isModal ? 10 : 6;
+  const chartHeightClass = isModal ? 'h-[168px]' : 'h-[92px]';
+  const wrapperPadding = isModal ? 'p-4 md:p-5' : 'p-3';
+  const headingClass = isModal ? 'text-[11px]' : 'text-[10px]';
+  const subheadingClass = isModal ? 'text-sm' : 'text-xs';
 
   if (points.length === 0) {
     return (
-      <div className="h-[92px] rounded-xl border border-emerald-100 bg-emerald-50/50 flex items-center justify-center text-xs text-slate-500">
+      <div className={`${chartHeightClass} rounded-xl border border-emerald-100 bg-emerald-50/50 flex items-center justify-center text-xs text-slate-500`}>
         Aguardando histórico
       </div>
     );
@@ -66,19 +75,25 @@ export const ServiceTrendChart = ({ history, status }: ServiceTrendChartProps) =
   const lastPoint = coords[coords.length - 1];
 
   return (
-    <div className="rounded-xl border border-emerald-100 bg-[#f7fff9] p-3">
-      <div className="flex items-center justify-between mb-2">
+    <div className={`rounded-xl border border-emerald-100 bg-[#f7fff9] ${wrapperPadding}`}>
+      <div className={`flex items-center justify-between ${isModal ? 'mb-4' : 'mb-2'}`}>
         <div>
-          <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Volume recente</p>
-          <p className="text-xs text-slate-500">Cada ponto representa uma coleta recente do monitoramento.</p>
+          <p className={`${headingClass} uppercase tracking-[0.24em] text-slate-500`}>Volume recente</p>
+          <p className={`${subheadingClass} text-slate-500`}>Cada ponto representa uma coleta recente do monitoramento.</p>
         </div>
-        <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500">{points.length} pontos</div>
+        <div className={`${headingClass} uppercase tracking-[0.22em] text-slate-500`}>{points.length} pontos</div>
       </div>
 
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[92px]" preserveAspectRatio="none" aria-hidden="true">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className={`w-full ${chartHeightClass}`}
+        preserveAspectRatio={isModal ? 'xMidYMid meet' : 'none'}
+        shapeRendering="geometricPrecision"
+        aria-hidden="true"
+      >
         <defs>
           <filter id={`glow-${status}`}>
-            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feGaussianBlur stdDeviation={isModal ? '2.6' : '3'} result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -86,14 +101,33 @@ export const ServiceTrendChart = ({ history, status }: ServiceTrendChartProps) =
           </filter>
         </defs>
 
-        {[0.25, 0.5, 0.75].map((ratio) => {
+        {[0.2, 0.4, 0.6, 0.8].map((ratio) => {
           const y = padY + ratio * (height - padY * 2);
-          return <line key={ratio} x1={padX} x2={width - padX} y1={y} y2={y} stroke="rgba(148,163,184,0.35)" strokeDasharray="4 5" />;
+          return (
+            <line
+              key={ratio}
+              x1={padX}
+              x2={width - padX}
+              y1={y}
+              y2={y}
+              stroke="rgba(148,163,184,0.28)"
+              strokeDasharray={isModal ? '6 8' : '4 5'}
+            />
+          );
         })}
 
         <path d={areaPath} fill={palette.fill} />
-        <path d={linePath} fill="none" stroke={palette.stroke} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" filter={`url(#glow-${status})`} />
-        <circle cx={lastPoint.x} cy={lastPoint.y} r="4.5" fill={palette.stroke} stroke={palette.glow} strokeWidth="6" />
+        <path
+          d={linePath}
+          fill="none"
+          stroke={palette.stroke}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          filter={`url(#glow-${status})`}
+          vectorEffect="non-scaling-stroke"
+        />
+        <circle cx={lastPoint.x} cy={lastPoint.y} r={pointRadius} fill={palette.stroke} stroke={palette.glow} strokeWidth={pointGlow} />
       </svg>
     </div>
   );

@@ -36,7 +36,7 @@ const sections = [
 const professionalLinks = [
   {
     label: 'LinkedIn',
-    href: 'https://www.linkedin.com/in/brian-lucca/',
+    href: 'https://www.linkedin.com/in/brian-lucca-cardozo',
     icon: BriefcaseBusiness
   },
   {
