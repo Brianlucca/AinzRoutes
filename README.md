@@ -2,7 +2,7 @@
 
 Frontend for **AinzRoutes**, a web platform focused on network diagnostics, service monitoring, observability, and technical utility tools in a single interface.
 
-The project was built to centralize useful tools for operational and infrastructure analysis, including:
+The project centralizes useful tools for operational and infrastructure analysis, including:
 
 - general dashboard with charts and metrics
 - IP and domain inspection
@@ -15,33 +15,33 @@ The project was built to centralize useful tools for operational and infrastruct
 
 ## What This Project Is
 
-AinzRoutes is a **React + TypeScript + Vite** frontend styled with **Tailwind CSS**. It consumes a backend API responsible for network checks, technical queries, service monitoring, and controlled command execution.
+AinzRoutes is a **React + TypeScript + Vite** frontend styled with **Tailwind CSS**. It consumes the AinzRoutes backend API and organizes technical responses into a cleaner, visual workflow for real-world usage.
 
-The frontend organizes those backend capabilities into a visual, user-friendly experience focused on:
+The interface was designed to support:
 
 - fast data reading
-- clear technical workflows
+- technical workflows with low friction
 - status, risk, and connectivity visualization
-- responsive usage across desktop and mobile
+- desktop and mobile usage
 
 ## How The Frontend Works
 
 The frontend is responsible for:
 
-- rendering the main views and navigation
+- rendering the main views and sidebar navigation
 - calling backend API endpoints
 - transforming technical responses into cards, charts, tables, and modals
 - storing lightweight browser-side preferences such as recent searches and local alerts
 - refreshing monitoring areas automatically when needed
 
-It does **not** perform every deep technical operation by itself. In most features, the browser acts as the interface layer while the backend performs the actual checks and returns the results.
+In most features, the browser works as the interface layer while the backend performs the actual technical checks and returns the results.
 
 ### General Flow
 
 1. the user opens a tool from the sidebar
 2. the frontend calls the matching API endpoint
 3. the response is processed and rendered visually
-4. in some areas, such as monitoring, the frontend refreshes the data periodically
+4. some views refresh data automatically, especially monitoring-related screens
 5. in specific features, the browser also performs real client-side checks, such as part of the IPv6 diagnostics flow
 
 ## Main Views
@@ -77,7 +77,7 @@ Runs real browser-side connectivity checks to verify:
 - dual-stack behavior
 - compatibility score from `0 to 10`
 
-This screen combines:
+This view combines:
 
 - tests executed directly from the browser session
 - complementary data returned by the backend API
@@ -176,79 +176,23 @@ src/
 - `React Leaflet`
 - `Lucide React`
 
-## Requirements
+## External Services Used By The Frontend
 
-To run the frontend locally, you need:
+The frontend itself uses **ipify** for browser-side public IP and connectivity checks in the IPv6 diagnostics screen.
 
-- `Node.js`
-- `npm`
-- the AinzRoutes backend available
+Current endpoints used on the client side:
 
-## Running The Frontend
+- `https://api4.ipify.org?format=json`
+- `https://api6.ipify.org?format=json`
+- `https://api64.ipify.org?format=json`
 
-### 1. Install dependencies
+Purpose:
 
-```bash
-npm install
-```
+- detect public IPv4
+- detect public IPv6
+- verify dual-stack behavior from the browser session
 
-### 2. Configure the backend URL
-
-Create a local `.env` file based on `.env.example`:
-
-```env
-VITE_API_BASE_URL=http://localhost:3333/api
-```
-
-### 3. Start development mode
-
-```bash
-npm run dev
-```
-
-### 4. Build for production
-
-```bash
-npm run build
-```
-
-### 5. Preview the production build
-
-```bash
-npm run preview
-```
-
-## Backend Communication
-
-The frontend reads the backend base URL from the Vite environment variable below:
-
-```env
-VITE_API_BASE_URL=http://localhost:3333/api
-```
-
-You can configure it in:
-
-- `.env` for local development
-- `.env.example` as a reference template
-- Vercel environment variables for production
-
-The frontend uses that API layer for:
-
-- session IP information
-- network diagnostics
-- IP analysis
-- port scanning
-- MTR enrichment
-- terminal responses
-- service monitoring data
-
-### Example For Vercel
-
-Set this in your Vercel project:
-
-```env
-VITE_API_BASE_URL=https://your-backend-domain.com/api
-```
+The frontend does **not** document backend-only providers here. Services such as IP geolocation providers used exclusively by the backend should remain documented in the backend project instead.
 
 ## Browser Storage
 
@@ -267,14 +211,6 @@ This data stays in the user browser and is used only for local interface persist
 - certain detections, such as the user's exact DNS resolver, have natural browser limitations
 - the IPv6 diagnostics screen combines real session-based tests with backend-assisted data
 - monitoring notifications depend on browser permission
-
-## Available Scripts
-
-- `npm run dev`: starts the frontend in development mode
-- `npm run build`: generates the production build
-- `npm run preview`: serves the local production build
-- `npm run lint`: runs lint checks
-
 
 ## Author
 
