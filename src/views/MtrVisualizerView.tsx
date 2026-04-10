@@ -16,6 +16,10 @@ export interface MtrData {
   geo?: {
     country: string;
     city: string;
+    regionName?: string;
+    lat?: number;
+    lon?: number;
+    query?: string;
   };
   asn?: {
     org: string;

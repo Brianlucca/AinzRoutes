@@ -41,7 +41,7 @@ const professionalLinks = [
   },
   {
     label: 'GitHub',
-    href: 'https://github.com/',
+    href: 'https://github.com/Brianlucca',
     icon: Workflow
   }
 ];
