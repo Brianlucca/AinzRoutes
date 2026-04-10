@@ -166,21 +166,16 @@ export const ServicesStatusView = () => {
     return () => clearInterval(interval);
   }, [customMonitors, watchedServiceIds, notificationPermission]);
 
-  const requestNotificationPermission = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setNotificationPermission('unsupported');
-      return 'unsupported' as const;
-    }
-
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-    return permission;
-  };
-
   const toggleServiceAlert = async (serviceId: string) => {
     let effectivePermission = notificationPermission;
 
     if (effectivePermission === 'default') {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        setNotificationPermission('unsupported');
+        setError('As notificações do navegador não estão disponíveis neste dispositivo.');
+        return;
+      }
+
       const shouldRequestPermission = window.confirm(
         'Para ativar esse alerta, o AinzRoutes precisa da permissão de notificações do navegador. Ela será usada apenas para avisar quando o serviço ficar instável, offline ou voltar ao normal. Deseja continuar?'
       );
@@ -189,7 +184,8 @@ export const ServicesStatusView = () => {
         return;
       }
 
-      effectivePermission = await requestNotificationPermission();
+      effectivePermission = await Notification.requestPermission();
+      setNotificationPermission(effectivePermission);
     }
 
     if (effectivePermission === 'denied' || effectivePermission === 'unsupported') {
