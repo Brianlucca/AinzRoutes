@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivitySquare, Bell, RefreshCw, ShieldAlert } from 'lucide-react';
+import { ActivitySquare, RefreshCw, ShieldAlert } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
@@ -169,19 +169,27 @@ export const ServicesStatusView = () => {
   const requestNotificationPermission = async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
       setNotificationPermission('unsupported');
-      return;
+      return 'unsupported' as const;
     }
 
     const permission = await Notification.requestPermission();
     setNotificationPermission(permission);
+    return permission;
   };
 
   const toggleServiceAlert = async (serviceId: string) => {
     let effectivePermission = notificationPermission;
 
     if (effectivePermission === 'default') {
-      await requestNotificationPermission();
-      effectivePermission = typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported';
+      const shouldRequestPermission = window.confirm(
+        'Para ativar esse alerta, o AinzRoutes precisa da permissão de notificações do navegador. Ela será usada apenas para avisar quando o serviço ficar instável, offline ou voltar ao normal. Deseja continuar?'
+      );
+
+      if (!shouldRequestPermission) {
+        return;
+      }
+
+      effectivePermission = await requestNotificationPermission();
     }
 
     if (effectivePermission === 'denied' || effectivePermission === 'unsupported') {
@@ -283,45 +291,34 @@ export const ServicesStatusView = () => {
   });
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+    <div className="relative space-y-6">
+      <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
         <div className="flex flex-col space-y-2">
-          <h2 className="text-2xl font-bold text-slate-900 flex items-center">
-            <ActivitySquare className="w-6 h-6 mr-2 text-emerald-600" />
+          <h2 className="flex items-center text-2xl font-bold text-slate-900">
+            <ActivitySquare className="mr-2 h-6 w-6 text-emerald-600" />
             Status Global de Serviços
           </h2>
-          <p className="text-slate-600">Monitoramento organizado por confiabilidade da fonte. A latência exibida é medida do servidor da API até o alvo monitorado.</p>
+          <p className="text-slate-600">
+            Monitoramento organizado por confiabilidade da fonte. A latência exibida é medida do servidor da API até o alvo monitorado.
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={requestNotificationPermission}
-            className="flex items-center px-4 py-2 bg-white border border-emerald-200 hover:bg-emerald-50 text-slate-700 rounded-xl transition-colors shadow-sm"
-          >
-            <Bell className="w-4 h-4 mr-2 text-emerald-600" />
-            {notificationPermission === 'granted'
-              ? 'Notificações ativas'
-              : notificationPermission === 'denied'
-                ? 'Notificações bloqueadas'
-                : notificationPermission === 'unsupported'
-                  ? 'Notificações indisponíveis'
-                  : 'Ativar notificações'}
-          </button>
-          <button
             onClick={fetchStatus}
             disabled={isLoading}
-            className="flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-sm"
+            className="flex items-center rounded-xl bg-emerald-600 px-4 py-2 text-white shadow-sm transition-colors hover:bg-emerald-500"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             {isLoading ? 'Atualizando...' : 'Atualizar agora'}
           </button>
         </div>
       </div>
 
-      <div className="bg-white border border-emerald-100 rounded-2xl p-4 shadow-sm">
+      <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
         <p className="text-sm text-slate-700">
           <span className="font-semibold text-slate-900">{watchedServiceIds.length}</span> serviço(s) em alerta.
-          {' '}Ative um serviço para receber aviso quando ele ficar instável, offline ou voltar ao normal.
+          {' '}Ao ativar um alerta em um serviço, o navegador pode pedir permissão para enviar notificações de instabilidade, queda e recuperação.
         </p>
       </div>
 
@@ -342,15 +339,15 @@ export const ServicesStatusView = () => {
 
       {customServices.length > 0 ? (
         <section className="space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Monitores personalizados</h3>
-              <p className="text-sm text-slate-600 mt-1 max-w-3xl">Os itens adicionados por você também entram na rotina de atualização automática do monitoramento.</p>
+              <p className="mt-1 max-w-3xl text-sm text-slate-600">Os itens adicionados por você também entram na rotina de atualização automática do monitoramento.</p>
             </div>
-            <div className="text-xs text-slate-500 uppercase tracking-widest">{customServices.length} itens</div>
+            <div className="text-xs uppercase tracking-widest text-slate-500">{customServices.length} itens</div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {customServices.map((service) => (
               <ServiceCard
                 key={service.id}
@@ -366,20 +363,20 @@ export const ServicesStatusView = () => {
       ) : null}
 
       {isMajorityOffline && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start space-x-4">
-          <ShieldAlert className="w-6 h-6 text-amber-500 flex-shrink-0 mt-1" />
-          <p className="text-sm text-amber-800 leading-relaxed">
+        <div className="flex items-start space-x-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <ShieldAlert className="mt-1 h-6 w-6 flex-shrink-0 text-amber-500" />
+          <p className="text-sm leading-relaxed text-amber-800">
             Se 80% ou mais dos itens retornarem offline, pode haver instabilidade no próprio ambiente de origem ou na rede entre o navegador e a API. Itens marcados como reachability não equivalem a um status oficial do serviço.
           </p>
         </div>
       )}
 
-      {error && <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">{error}</div>}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>}
 
       <div>
         {isLoading && services.length === 0 ? (
           <div className="col-span-full flex justify-center py-12">
-            <RefreshCw className="w-8 h-8 animate-spin text-emerald-600" />
+            <RefreshCw className="h-8 w-8 animate-spin text-emerald-600" />
           </div>
         ) : (
           <div className="space-y-10">
