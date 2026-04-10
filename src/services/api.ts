@@ -39,15 +39,6 @@ export const api = {
     return response.json();
   },
 
-  executeCommand: async (command: string, target: string) => {
-    const response = await fetch(`${BASE_URL}/terminal/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command, target })
-    });
-    return response.json();
-  },
-
   getServicesStatus: async () => {
     const response = await fetch(`${BASE_URL}/services/status`);
     if (!response.ok) throw new Error('Falha ao buscar o estado dos serviços');

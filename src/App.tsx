@@ -6,7 +6,6 @@ import { Ipv6DiagnostickView } from './views/Ipv6DiagnostickView';
 import { MtrVisualizerView } from './views/MtrVisualizerView';
 import { PortScannerView } from './views/PortScannerView';
 import { Ipv4CalculatorView } from './views/Ipv4CalculatorView';
-import { TerminalView } from './views/TerminalView';
 import { ServicesStatusView } from './views/ServicesStatusView';
 import { TermsView } from './views/TermsView';
 
@@ -17,7 +16,6 @@ const viewRegistry: Record<string, React.FC<any>> = {
   mtr: MtrVisualizerView,
   ports: PortScannerView,
   ipv4: Ipv4CalculatorView,
-  terminal: TerminalView,
   services: ServicesStatusView,
   terms: TermsView,
 };
