@@ -56,16 +56,16 @@ export const PortScannerView = () => {
 
       <TargetInput target={target} setTarget={setTarget} customPorts={customPorts} setCustomPorts={setCustomPorts} onScan={handleScan} />
 
-      {error && <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">{error}</div>}
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div> : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white border border-emerald-100 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center space-x-3 mb-4">
-            <Shield className="text-emerald-600 w-6 h-6" />
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center space-x-3">
+            <Shield className="h-6 w-6 text-emerald-600" />
             <h3 className="text-lg font-semibold text-slate-900">Portas verificadas</h3>
           </div>
           {isScanning ? (
-            <p className="text-slate-500 animate-pulse">Escaneando...</p>
+            <p className="animate-pulse text-slate-500">Escaneando...</p>
           ) : scanData?.ports ? (
             <div className="space-y-2">
               {scanData.ports.map((p: any) => (
@@ -80,17 +80,17 @@ export const PortScannerView = () => {
           )}
         </div>
 
-        <div className="bg-white border border-emerald-100 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center space-x-3 mb-4">
-            <Lock className="text-amber-400 w-6 h-6" />
+        <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center space-x-3">
+            <Lock className="h-6 w-6 text-amber-400" />
             <h3 className="text-lg font-semibold text-slate-900">Certificado SSL</h3>
           </div>
           {isScanning ? (
-            <p className="text-slate-500 animate-pulse">Verificando certificado...</p>
+            <p className="animate-pulse text-slate-500">Verificando certificado...</p>
           ) : scanData ? (
             scanData.ssl ? (
               <div className="space-y-2 text-slate-700">
-                <p>Status: <span className="text-emerald-600 font-bold">Válido</span></p>
+                <p>Status: <span className="font-bold text-emerald-600">Válido</span></p>
                 <p>Emissor: {scanData.ssl.issuer}</p>
                 <p>Vence em: <span className={scanData.ssl.daysRemaining < 30 ? 'text-amber-500' : 'text-emerald-600'}>{scanData.ssl.daysRemaining} dias</span></p>
               </div>
