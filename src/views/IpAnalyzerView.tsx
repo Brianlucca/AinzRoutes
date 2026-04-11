@@ -66,24 +66,24 @@ export const IpAnalyzerView = () => {
       </div>
 
       {networkInfo?.network ? (
-        <section className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.24em] text-emerald-700 font-semibold">Conectividade da sessão</p>
-              <h3 className="text-lg font-semibold text-slate-900 mt-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">Conectividade da sessão</p>
+              <h3 className="mt-2 text-lg font-semibold text-slate-900">
                 {networkInfo.network.ipv6DetectedOnCurrentSession ? 'IPv6 detectado nesta sessão' : 'Sessão atual chegou por IPv4'}
               </h3>
-              <p className="text-sm text-slate-600 mt-2 max-w-3xl">{networkInfo.network.note}</p>
+              <p className="mt-2 max-w-3xl text-sm text-slate-600">{networkInfo.network.note}</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-[280px]">
+            <div className="grid min-w-[280px] grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-emerald-100 bg-[#f7fff9] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">IP atual</p>
-                <p className="font-mono text-slate-900 mt-2 break-all">{networkInfo.ip}</p>
+                <p className="mt-2 break-all font-mono text-slate-900">{networkInfo.ip}</p>
               </div>
               <div className="rounded-xl border border-emerald-100 bg-[#f7fff9] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Versão detectada</p>
-                <p className="text-slate-900 mt-2 font-semibold">{networkInfo.ipVersion ? `IPv${networkInfo.ipVersion}` : 'Não identificada'}</p>
+                <p className="mt-2 font-semibold text-slate-900">{networkInfo.ipVersion ? `IPv${networkInfo.ipVersion}` : 'Não identificada'}</p>
               </div>
             </div>
           </div>
@@ -92,7 +92,7 @@ export const IpAnalyzerView = () => {
 
       <SearchForm target={target} setTarget={setTarget} onSearch={handleSearch} />
 
-      {error && <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">{error}</div>}
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div> : null}
 
       <AnalysisResults isSearching={isSearching} data={data} />
     </div>
