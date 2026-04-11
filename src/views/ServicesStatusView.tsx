@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivitySquare, RefreshCw, ShieldAlert } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -17,7 +17,7 @@ const DefaultIcon = L.icon({
   iconUrl,
   shadowUrl: iconShadow,
   iconSize: [25, 41],
-  iconAnchor: [12, 41]
+  iconAnchor: [12, 41],
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
@@ -25,6 +25,7 @@ L.Marker.prototype.options.icon = DefaultIcon;
 const SERVICE_HISTORY_KEY = 'ainzroutes_service_history';
 const SERVICE_ALERTS_KEY = 'ainzroutes_service_alerts';
 const CUSTOM_MONITORS_KEY = 'ainzroutes_custom_monitors';
+const RECENT_SEARCHES_KEY = 'ainzroutes_recent_searches';
 const HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 interface CustomMonitorConfig {
@@ -32,32 +33,27 @@ interface CustomMonitorConfig {
   target: string;
   type: 'http' | 'tcp';
   port?: string;
+  intervalMinutes: number;
+  lastCheckedAt?: number;
 }
 
 const statusMessageMap: Record<Exclude<MonitorStatus, 'unknown'>, string> = {
   online: 'voltou ao normal',
   unstable: 'ficou instável',
-  offline: 'ficou offline'
+  offline: 'ficou offline',
+};
+
+const readStorage = <T,>(key: string, fallback: T): T => {
+  const saved = localStorage.getItem(key);
+  return saved ? JSON.parse(saved) : fallback;
 };
 
 export const ServicesStatusView = () => {
   const [services, setServices] = useState<ServiceStatus[]>([]);
-  const [historyByService, setHistoryByService] = useState<Record<string, ServiceHistoryPoint[]>>(() => {
-    const saved = localStorage.getItem(SERVICE_HISTORY_KEY);
-    return saved ? JSON.parse(saved) : {};
-  });
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-    const saved = localStorage.getItem('ainzroutes_recent_searches');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [watchedServiceIds, setWatchedServiceIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem(SERVICE_ALERTS_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [customMonitors, setCustomMonitors] = useState<CustomMonitorConfig[]>(() => {
-    const saved = localStorage.getItem(CUSTOM_MONITORS_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [historyByService, setHistoryByService] = useState<Record<string, ServiceHistoryPoint[]>>(() => readStorage(SERVICE_HISTORY_KEY, {}));
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => readStorage(RECENT_SEARCHES_KEY, []));
+  const [watchedServiceIds, setWatchedServiceIds] = useState<string[]>(() => readStorage(SERVICE_ALERTS_KEY, []));
+  const [customMonitors, setCustomMonitors] = useState<CustomMonitorConfig[]>(() => readStorage(CUSTOM_MONITORS_KEY, []));
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
@@ -66,10 +62,50 @@ export const ServicesStatusView = () => {
   const [customTarget, setCustomTarget] = useState('');
   const [customType, setCustomType] = useState<'http' | 'tcp'>('http');
   const [customPort, setCustomPort] = useState('');
+  const [customIntervalMinutes, setCustomIntervalMinutes] = useState('5');
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [modalData, setModalData] = useState<ModalData | null>(null);
+
   const hasLoadedInitialStatus = useRef(false);
   const previousStatusMapRef = useRef<Record<string, MonitorStatus>>({});
+  const servicesRef = useRef<ServiceStatus[]>([]);
+  const customMonitorsRef = useRef<CustomMonitorConfig[]>(customMonitors);
+
+  useEffect(() => {
+    servicesRef.current = services;
+  }, [services]);
+
+  useEffect(() => {
+    customMonitorsRef.current = customMonitors;
+  }, [customMonitors]);
+
+  const customMonitorSignature = useMemo(
+    () =>
+      customMonitors
+        .map((monitor) => `${monitor.id}:${monitor.target}:${monitor.type}:${monitor.port ?? ''}:${monitor.intervalMinutes}`)
+        .join('|'),
+    [customMonitors]
+  );
+
+  const persistHistory = (next: Record<string, ServiceHistoryPoint[]>) => {
+    localStorage.setItem(SERVICE_HISTORY_KEY, JSON.stringify(next));
+    return next;
+  };
+
+  const persistAlerts = (next: string[]) => {
+    localStorage.setItem(SERVICE_ALERTS_KEY, JSON.stringify(next));
+    return next;
+  };
+
+  const persistCustomMonitors = (next: CustomMonitorConfig[]) => {
+    localStorage.setItem(CUSTOM_MONITORS_KEY, JSON.stringify(next));
+    return next;
+  };
+
+  const persistRecentSearches = (next: string[]) => {
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+    return next;
+  };
 
   const triggerServiceNotification = (service: ServiceStatus, previousStatus: MonitorStatus) => {
     if (notificationPermission !== 'granted' || service.status === 'unknown' || previousStatus === service.status) {
@@ -79,12 +115,12 @@ export const ServicesStatusView = () => {
     const body =
       service.status === 'online'
         ? `${service.name} voltou ao normal. Última latência: ${service.latency !== null ? `${service.latency}ms` : 'indisponível'}.`
-        : `${service.name} ${statusMessageMap[service.status]}. Acompanhe o monitoramento para validar recuperação.`;
+        : `${service.name} ${statusMessageMap[service.status]}. Acompanhe o monitoramento para validar a recuperação.`;
 
     new Notification('AinzRoutes Monitoramento', {
       body,
       tag: `service-${service.id}`,
-      silent: false
+      silent: false,
     });
   };
 
@@ -97,24 +133,43 @@ export const ServicesStatusView = () => {
         const point: ServiceHistoryPoint = {
           timestamp: now,
           status: service.status,
-          latency: service.latency
+          latency: service.latency,
         };
 
         const current = nextHistory[service.id] || [];
         const last = current[current.length - 1];
-        const shouldAppend =
-          !last ||
-          last.status !== point.status ||
-          last.latency !== point.latency ||
-          now - last.timestamp > 45_000;
-
+        const shouldAppend = !last || last.status !== point.status || last.latency !== point.latency || now - last.timestamp > 45_000;
         const updated = shouldAppend ? [...current, point] : current;
         nextHistory[service.id] = updated.filter((item) => now - item.timestamp <= HISTORY_WINDOW_MS);
       });
 
-      localStorage.setItem(SERVICE_HISTORY_KEY, JSON.stringify(nextHistory));
-      return nextHistory;
+      return persistHistory(nextHistory);
     });
+  };
+
+  const updateCustomMonitorCheckpoints = (checkedAtById: Record<string, number>) => {
+    if (Object.keys(checkedAtById).length === 0) {
+      return;
+    }
+
+    setCustomMonitors((prev) => {
+      const next = prev.map((monitor) =>
+        checkedAtById[monitor.id] ? { ...monitor, lastCheckedAt: checkedAtById[monitor.id] } : monitor
+      );
+      return persistCustomMonitors(next);
+    });
+  };
+
+  const removeCustomMonitor = (serviceId: string) => {
+    setCustomMonitors((prev) => persistCustomMonitors(prev.filter((monitor) => monitor.id !== serviceId)));
+    setServices((prev) => prev.filter((service) => service.id !== serviceId));
+    setHistoryByService((prev) => {
+      const next = { ...prev };
+      delete next[serviceId];
+      return persistHistory(next);
+    });
+    setWatchedServiceIds((prev) => persistAlerts(prev.filter((id) => id !== serviceId)));
+    setModalData((prev) => (prev?.id === serviceId ? null : prev));
   };
 
   const fetchStatus = async () => {
@@ -122,22 +177,55 @@ export const ServicesStatusView = () => {
     setError(null);
 
     try {
-      const [baseServices, customResults] = await Promise.all([
+      const now = Date.now();
+      const currentCustomMonitors = customMonitorsRef.current;
+
+      const [baseServices, customCheckResults] = await Promise.all([
         api.getServicesStatus(),
         Promise.all(
-          customMonitors.map((monitor) =>
-            api.checkCustomService(monitor.target, monitor.type, monitor.port, monitor.id)
-          )
-        )
+          currentCustomMonitors.map(async (monitor) => {
+            const existing = servicesRef.current.find((service) => service.id === monitor.id);
+            const intervalMs = Math.max(monitor.intervalMinutes, 1) * 60_000;
+            const shouldCheck = !monitor.lastCheckedAt || now - monitor.lastCheckedAt >= intervalMs || !existing;
+
+            if (!shouldCheck && existing) {
+              return {
+                service: {
+                  ...existing,
+                  isCustom: true,
+                  customIntervalMinutes: monitor.intervalMinutes,
+                  lastCheckedAt: monitor.lastCheckedAt,
+                } satisfies ServiceStatus,
+                checkedAt: null as number | null,
+              };
+            }
+
+            const result = await api.checkCustomService(monitor.target, monitor.type, monitor.port, monitor.id);
+            return {
+              service: {
+                ...result,
+                isCustom: true,
+                customIntervalMinutes: monitor.intervalMinutes,
+                lastCheckedAt: now,
+              } satisfies ServiceStatus,
+              checkedAt: now,
+            };
+          })
+        ),
       ]);
 
-      const mergedServices: ServiceStatus[] = [
-        ...baseServices,
-        ...customResults.map((service: ServiceStatus) => ({ ...service, isCustom: true }))
-      ];
+      const checkedAtById = customCheckResults.reduce<Record<string, number>>((acc, item) => {
+        if (item.checkedAt && item.service.id) {
+          acc[item.service.id] = item.checkedAt;
+        }
+        return acc;
+      }, {});
+
+      const mergedServices: ServiceStatus[] = [...baseServices, ...customCheckResults.map((item) => item.service)];
 
       setServices(mergedServices);
       updateHistoryWindow(mergedServices);
+      updateCustomMonitorCheckpoints(checkedAtById);
 
       const nextStatusMap: Record<string, MonitorStatus> = {};
       mergedServices.forEach((service) => {
@@ -162,9 +250,9 @@ export const ServicesStatusView = () => {
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 60000);
+    const interval = setInterval(fetchStatus, 60_000);
     return () => clearInterval(interval);
-  }, [customMonitors, watchedServiceIds, notificationPermission]);
+  }, [customMonitorSignature, watchedServiceIds, notificationPermission]);
 
   const toggleServiceAlert = async (serviceId: string) => {
     let effectivePermission = notificationPermission;
@@ -195,8 +283,7 @@ export const ServicesStatusView = () => {
 
     setWatchedServiceIds((prev) => {
       const next = prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId];
-      localStorage.setItem(SERVICE_ALERTS_KEY, JSON.stringify(next));
-      return next;
+      return persistAlerts(next);
     });
   };
 
@@ -213,7 +300,7 @@ export const ServicesStatusView = () => {
           isp: ipInfo.isp,
           as: ipInfo.as,
           lat: ipInfo.lat,
-          lon: ipInfo.lon
+          lon: ipInfo.lon,
         };
       }
     } catch (geoError) {
@@ -226,35 +313,46 @@ export const ServicesStatusView = () => {
   const handleAddCustomService = async (targetToUse = customTarget) => {
     if (!targetToUse) return;
 
+    const parsedInterval = Number(customIntervalMinutes);
+    if (!Number.isFinite(parsedInterval) || parsedInterval < 1) {
+      setError('Informe um intervalo válido em minutos para o monitor personalizado.');
+      return;
+    }
+
     setIsAddingCustom(true);
     setError(null);
 
     try {
+      const checkedAt = Date.now();
       const config: CustomMonitorConfig = {
         id: `custom_monitor_${Date.now()}`,
         target: targetToUse,
         type: customType,
-        port: customPort || undefined
+        port: customPort || undefined,
+        intervalMinutes: Math.min(parsedInterval, 1440),
+        lastCheckedAt: checkedAt,
       };
 
       const result = await api.checkCustomService(config.target, config.type, config.port, config.id);
-      const geo = await enrichGeoForTarget(result);
-      setModalData({ ...result, isCustom: true, geo });
+      const nextService: ServiceStatus = {
+        ...result,
+        isCustom: true,
+        customIntervalMinutes: config.intervalMinutes,
+        lastCheckedAt: checkedAt,
+      };
+      const geo = await enrichGeoForTarget(nextService);
+      setModalData({ ...nextService, geo });
 
-      setCustomMonitors((prev) => {
-        const next = [...prev, config];
-        localStorage.setItem(CUSTOM_MONITORS_KEY, JSON.stringify(next));
-        return next;
-      });
+      setCustomMonitors((prev) => persistCustomMonitors([...prev, config]));
 
       if (!recentSearches.includes(targetToUse)) {
         const newSearches = [targetToUse, ...recentSearches].slice(0, 5);
-        setRecentSearches(newSearches);
-        localStorage.setItem('ainzroutes_recent_searches', JSON.stringify(newSearches));
+        setRecentSearches(persistRecentSearches(newSearches));
       }
 
       setCustomTarget('');
       setCustomPort('');
+      setCustomIntervalMinutes('5');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -275,7 +373,7 @@ export const ServicesStatusView = () => {
   const groupedServices: Record<MonitorSignal, ServiceStatus[]> = {
     official_service_status: [],
     page_reachability: [],
-    endpoint_reachability: []
+    endpoint_reachability: [],
   };
 
   const customServices = services.filter((service) => service.isCustom);
@@ -313,8 +411,8 @@ export const ServicesStatusView = () => {
 
       <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
         <p className="text-sm text-slate-700">
-          <span className="font-semibold text-slate-900">{watchedServiceIds.length}</span> serviço(s) em alerta.
-          {' '}Ao ativar um alerta em um serviço, o navegador pode pedir permissão para enviar notificações de instabilidade, queda e recuperação.
+          <span className="font-semibold text-slate-900">{watchedServiceIds.length}</span> serviço(s) em alerta. Ao ativar um alerta em um
+          serviço, o navegador pode pedir permissão para enviar notificações de instabilidade, queda e recuperação.
         </p>
       </div>
 
@@ -324,11 +422,13 @@ export const ServicesStatusView = () => {
         customTarget={customTarget}
         customType={customType}
         customPort={customPort}
+        customIntervalMinutes={customIntervalMinutes}
         recentSearches={recentSearches}
         isAddingCustom={isAddingCustom}
         onCustomTargetChange={setCustomTarget}
         onCustomTypeChange={setCustomType}
         onCustomPortChange={setCustomPort}
+        onCustomIntervalChange={setCustomIntervalMinutes}
         onUseRecent={setCustomTarget}
         onSubmit={() => handleAddCustomService(customTarget)}
       />
@@ -338,7 +438,9 @@ export const ServicesStatusView = () => {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Monitores personalizados</h3>
-              <p className="mt-1 max-w-3xl text-sm text-slate-600">Os itens adicionados por você também entram na rotina de atualização automática do monitoramento.</p>
+              <p className="mt-1 max-w-3xl text-sm text-slate-600">
+                Cada item define seu próprio intervalo de verificação e continua sendo armazenado localmente no navegador do usuário.
+              </p>
             </div>
             <div className="text-xs uppercase tracking-widest text-slate-500">{customServices.length} itens</div>
           </div>
@@ -352,22 +454,23 @@ export const ServicesStatusView = () => {
                 onClick={handleServiceClick}
                 isWatched={watchedServiceIds.includes(service.id)}
                 onToggleWatch={toggleServiceAlert}
+                onDeleteCustom={removeCustomMonitor}
               />
             ))}
           </div>
         </section>
       ) : null}
 
-      {isMajorityOffline && (
+      {isMajorityOffline ? (
         <div className="flex items-start space-x-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <ShieldAlert className="mt-1 h-6 w-6 flex-shrink-0 text-amber-500" />
           <p className="text-sm leading-relaxed text-amber-800">
             Se 80% ou mais dos itens retornarem offline, pode haver instabilidade no próprio ambiente de origem ou na rede entre o navegador e a API. Itens marcados como reachability não equivalem a um status oficial do serviço.
           </p>
         </div>
-      )}
+      ) : null}
 
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>}
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div> : null}
 
       <div>
         {isLoading && services.length === 0 ? (
@@ -409,6 +512,7 @@ export const ServicesStatusView = () => {
         onClose={() => setModalData(null)}
         isWatched={modalData ? watchedServiceIds.includes(modalData.id) : false}
         onToggleWatch={modalData ? () => toggleServiceAlert(modalData.id) : undefined}
+        onDeleteCustom={modalData?.isCustom ? () => removeCustomMonitor(modalData.id) : undefined}
         history={modalData ? historyByService[modalData.id] || [] : []}
       />
     </div>
