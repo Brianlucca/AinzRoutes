@@ -80,7 +80,7 @@ export const runProbe = async (id: string, label: string, endpoint: string, kind
       address,
       version,
       transportLabel: version ? `usando IPv${version}` : 'sem identificação de transporte',
-      detail: buildProbeDetail(label, success, version)
+      detail: buildProbeDetail(label, success, version),
     };
   } catch (error: any) {
     return {
@@ -91,7 +91,7 @@ export const runProbe = async (id: string, label: string, endpoint: string, kind
       address: null,
       version: null,
       transportLabel: 'falhou',
-      detail: error?.message ? `${label} falhou: ${error.message}.` : `${label} falhou nesta sessão.`
+      detail: error?.message ? `${label} falhou: ${error.message}.` : `${label} falhou nesta sessão.`,
     };
   }
 };
@@ -131,13 +131,13 @@ export const buildFallbackDiagnostics = async (getMyIp: () => Promise<any>): Pro
     addressing: {
       ipv4: session?.ipVersion === 4 ? session.ip : null,
       ipv6: session?.ipVersion === 6 ? session.ip : null,
-      currentTransportVersion: session?.ipVersion ? `IPv${session.ipVersion}` : 'indisponível'
+      currentTransportVersion: session?.ipVersion ? `IPv${session.ipVersion}` : 'indisponível',
     },
     provider: null,
     dns: {
       userDnsDetected: false,
-      note: 'O backend não retornou o diagnóstico avançado completo nesta execução.',
-      serverResolvers: []
-    }
+      note: 'O diagnóstico completo não pôde ser carregado nesta execução.',
+      serverResolvers: [],
+    },
   };
 };
