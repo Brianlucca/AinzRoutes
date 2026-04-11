@@ -28,7 +28,7 @@ const resolveBrowserPublicIp = async () => {
   const response = await fetch('https://api64.ipify.org?format=json');
 
   if (!response.ok) {
-    throw new Error('Falha ao descobrir o IP público da sessão pelo navegador');
+    throw new Error('Não foi possível identificar o IP público nesta sessão.');
   }
 
   const data = await response.json();
@@ -38,7 +38,7 @@ const resolveBrowserPublicIp = async () => {
 export const api = {
   getMyIp: async () => {
     const response = await fetch(`${BASE_URL}/ip/me`);
-    if (!response.ok) throw new Error('Falha ao buscar seu IP');
+    if (!response.ok) throw new Error('Não foi possível carregar o IP atual.');
 
     const data = await response.json();
 
@@ -56,7 +56,7 @@ export const api = {
                   ...data.network,
                   requestIp: browserIp,
                   requestIpVersion: getIpVersion(browserIp),
-                  note: 'O backend local retornou loopback, então o frontend usou a sessão real do navegador para preencher o IP público.',
+                  note: 'O IP público foi preenchido a partir da sessão atual do navegador.',
                 }
               : undefined,
           };
@@ -71,20 +71,27 @@ export const api = {
 
   getNetworkDiagnostics: async () => {
     const response = await fetch(`${BASE_URL}/network/diagnostics`);
-    if (!response.ok) throw new Error('Falha ao buscar o diagnóstico de rede');
+    if (!response.ok) throw new Error('Não foi possível carregar o diagnóstico de rede.');
     return response.json();
   },
 
-  analyzeIp: async (target: string) => {
-    const response = await fetch(`${BASE_URL}/ip/analyze/${target}`);
-    if (!response.ok) throw new Error('Falha ao buscar dados no backend');
+  analyzeIp: async (target: string, turnstileToken?: string) => {
+    const response = await fetch(`${BASE_URL}/ip/analyze/${target}`, {
+      headers: turnstileToken
+        ? {
+            'x-turnstile-token': turnstileToken,
+          }
+        : undefined,
+    });
+
+    if (!response.ok) throw new Error('Não foi possível concluir a análise solicitada.');
     return response.json();
   },
 
   getDnsOptimizer: async (targets?: string[]) => {
     const query = targets?.length ? `?targets=${encodeURIComponent(targets.join(','))}` : '';
     const response = await fetch(`${BASE_URL}/dns/optimizer${query}`);
-    if (!response.ok) throw new Error('Falha ao carregar o benchmark de DNS');
+    if (!response.ok) throw new Error('Não foi possível carregar o teste de DNS.');
     return response.json();
   },
 
@@ -94,39 +101,57 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mtrData }),
     });
-    if (!response.ok) throw new Error('Falha na comunicação com o backend');
+    if (!response.ok) throw new Error('Não foi possível concluir a solicitação no momento.');
     return response.json();
   },
 
-  scanTarget: async (target: string, ports?: number[]) => {
+  scanTarget: async (target: string, ports?: number[], turnstileToken?: string) => {
     const response = await fetch(`${BASE_URL}/scanner/scan`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(turnstileToken ? { 'x-turnstile-token': turnstileToken } : {}),
+      },
       body: JSON.stringify({ target, ports }),
     });
-    if (!response.ok) throw new Error('Falha na comunicação com o backend');
+    if (!response.ok) throw new Error('Não foi possível concluir a solicitação no momento.');
     return response.json();
   },
 
   getServicesStatus: async () => {
     const response = await fetch(`${BASE_URL}/services/status`);
-    if (!response.ok) throw new Error('Falha ao buscar o estado dos serviços');
+    if (!response.ok) throw new Error('Não foi possível carregar o monitoramento de serviços.');
     return response.json();
   },
 
   getServicesOverview: async () => {
     const response = await fetch(`${BASE_URL}/services/overview`);
-    if (!response.ok) throw new Error('Falha ao buscar o overview do monitoramento');
+    if (!response.ok) throw new Error('Não foi possível carregar o painel geral.');
     return response.json();
   },
 
-  checkCustomService: async (target: string, type: string, port?: string, monitorId?: string) => {
+  checkCustomService: async (target: string, type: string, port?: string, monitorId?: string, turnstileToken?: string) => {
     const response = await fetch(`${BASE_URL}/services/check`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(turnstileToken ? { 'x-turnstile-token': turnstileToken } : {}),
+      },
       body: JSON.stringify({ target, type, port, monitorId }),
     });
-    if (!response.ok) throw new Error('Falha ao verificar serviço customizado');
+    if (!response.ok) throw new Error('Não foi possível validar o monitor informado.');
+    return response.json();
+  },
+
+  refreshCustomService: async (target: string, type: string, port?: string, monitorId?: string) => {
+    const response = await fetch(`${BASE_URL}/services/check/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ target, type, port, monitorId }),
+    });
+    if (!response.ok) throw new Error('Não foi possível atualizar o monitor informado.');
     return response.json();
   },
 };
