@@ -8,6 +8,8 @@ export interface ServiceStatus {
   id: string;
   name: string;
   isCustom?: boolean;
+  customIntervalMinutes?: number;
+  lastCheckedAt?: number;
   category?: MonitorCategory;
   status: MonitorStatus;
   latency: number | null;

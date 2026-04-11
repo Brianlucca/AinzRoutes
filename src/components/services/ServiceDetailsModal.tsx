@@ -1,4 +1,4 @@
-import { Bell, BellOff, Globe, Loader2, MapPin, Server, X } from 'lucide-react';
+import { Bell, BellOff, Globe, Loader2, MapPin, Server, TimerReset, Trash2, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import { ServiceTrendChart } from './ServiceTrendChart';
@@ -10,6 +10,7 @@ interface ServiceDetailsModalProps {
   onClose: () => void;
   isWatched?: boolean;
   onToggleWatch?: () => void;
+  onDeleteCustom?: () => void;
   history?: ServiceHistoryPoint[];
 }
 
@@ -18,6 +19,7 @@ export const ServiceDetailsModal = ({
   onClose,
   isWatched = false,
   onToggleWatch,
+  onDeleteCustom,
   history = [],
 }: ServiceDetailsModalProps) => {
   if (!data || typeof document === 'undefined') {
@@ -53,22 +55,39 @@ export const ServiceDetailsModal = ({
                   <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] text-slate-700">
                     {getCategoryLabel(data.category)}
                   </span>
+                  {data.isCustom && data.customIntervalMinutes ? (
+                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-white px-2 py-1 text-[11px] text-slate-700">
+                      <TimerReset className="mr-1 h-3 w-3 text-emerald-600" />
+                      A cada {data.customIntervalMinutes} min
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
-              {onToggleWatch ? (
-                <button
-                  onClick={onToggleWatch}
-                  className={`inline-flex items-center rounded-xl border px-4 py-2 transition-colors ${
-                    isWatched
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-emerald-100 bg-white text-slate-700 hover:bg-emerald-50'
-                  }`}
-                >
-                  {isWatched ? <Bell className="mr-2 h-4 w-4" /> : <BellOff className="mr-2 h-4 w-4" />}
-                  {isWatched ? 'Desativar alerta' : 'Ativar alerta'}
-                </button>
-              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {onDeleteCustom && data.isCustom ? (
+                  <button
+                    onClick={onDeleteCustom}
+                    className="inline-flex items-center rounded-xl border border-red-100 bg-white px-4 py-2 text-slate-700 transition-colors hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir monitor
+                  </button>
+                ) : null}
+                {onToggleWatch ? (
+                  <button
+                    onClick={onToggleWatch}
+                    className={`inline-flex items-center rounded-xl border px-4 py-2 transition-colors ${
+                      isWatched
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : 'border-emerald-100 bg-white text-slate-700 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {isWatched ? <Bell className="mr-2 h-4 w-4" /> : <BellOff className="mr-2 h-4 w-4" />}
+                    {isWatched ? 'Desativar alerta' : 'Ativar alerta'}
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -80,8 +99,7 @@ export const ServiceDetailsModal = ({
                 <p className="mb-1 text-[10px] font-bold uppercase text-slate-500">Latência</p>
                 <p className="text-lg font-mono text-slate-800">{data.latency !== null ? `${data.latency}ms` : '--'}</p>
                 <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                  Essa latência mostra o tempo entre o servidor da API e o alvo monitorado. Ela não representa a rota real
-                  entre o navegador do usuário e o serviço final.
+                  Essa latência mostra o tempo entre o servidor da API e o alvo monitorado. Ela não representa a rota real entre o navegador do usuário e o serviço final.
                 </p>
               </div>
             </div>
@@ -171,7 +189,7 @@ export const ServiceDetailsModal = ({
                       <span className="text-right text-slate-700">{data.geo.as}</span>
                     </p>
                   </div>
-                  {data.geo.lat && data.geo.lon && (
+                  {data.geo.lat && data.geo.lon ? (
                     <div className="relative z-0 h-[220px] w-full overflow-hidden rounded-xl border border-emerald-100">
                       <MapContainer center={[data.geo.lat, data.geo.lon]} zoom={12} scrollWheelZoom className="h-full w-full">
                         <TileLayer
@@ -190,7 +208,7 @@ export const ServiceDetailsModal = ({
                         }
                       `}</style>
                     </div>
-                  )}
+                  ) : null}
                 </>
               ) : (
                 <div className="py-4 text-center text-sm text-slate-500">Geolocalização não disponível para este alvo.</div>
