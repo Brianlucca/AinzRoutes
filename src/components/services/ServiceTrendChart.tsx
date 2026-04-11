@@ -131,8 +131,8 @@ const ServiceTrendChartComponent = ({ history, status, variant = 'card' }: Servi
         ) : null}
       </div>
 
-      <div className={isModal ? 'h-[188px]' : 'h-[110px]'}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div className={isModal ? 'h-[188px] w-full min-w-0' : 'h-[110px] w-full min-w-0'}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={120} minHeight={isModal ? 188 : 110}>
           <AreaChart
             data={chartData}
             margin={isModal ? { top: 4, right: 2, left: -24, bottom: 0 } : { top: 12, right: 8, left: 8, bottom: 8 }}
