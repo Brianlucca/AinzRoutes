@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivitySquare, RefreshCw, ShieldAlert } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -9,6 +9,7 @@ import { ServiceCheckForm } from '../components/services/ServiceCheckForm';
 import { ServiceDetailsModal } from '../components/services/ServiceDetailsModal';
 import { ServiceGroupSection } from '../components/services/ServiceGroupSection';
 import { ServiceSummary } from '../components/services/ServiceSummary';
+import { TurnstileModal } from '../components/security/TurnstileModal';
 import type { ModalData, MonitorSignal, MonitorStatus, ServiceHistoryPoint, ServiceStatus } from '../components/services/types';
 import { getAnalyzeTarget } from '../components/services/utils';
 import { api } from '../services/api';
@@ -65,6 +66,8 @@ export const ServicesStatusView = () => {
   const [customIntervalMinutes, setCustomIntervalMinutes] = useState('5');
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [modalData, setModalData] = useState<ModalData | null>(null);
+  const [turnstileOpen, setTurnstileOpen] = useState(false);
+  const [pendingCustomTarget, setPendingCustomTarget] = useState<string | null>(null);
 
   const hasLoadedInitialStatus = useRef(false);
   const previousStatusMapRef = useRef<Record<string, MonitorStatus>>({});
@@ -200,7 +203,7 @@ export const ServicesStatusView = () => {
               };
             }
 
-            const result = await api.checkCustomService(monitor.target, monitor.type, monitor.port, monitor.id);
+            const result = await api.refreshCustomService(monitor.target, monitor.type, monitor.port, monitor.id);
             return {
               service: {
                 ...result,
@@ -287,12 +290,12 @@ export const ServicesStatusView = () => {
     });
   };
 
-  const enrichGeoForTarget = async (service: Pick<ServiceStatus, 'resolvedTarget' | 'target' | 'url'>) => {
+  const enrichGeoForTarget = async (service: Pick<ServiceStatus, 'resolvedTarget' | 'target' | 'url'>, turnstileToken?: string) => {
     const targetToAnalyze = getAnalyzeTarget(service);
     if (!targetToAnalyze) return undefined;
 
     try {
-      const ipInfo = await api.analyzeIp(targetToAnalyze);
+      const ipInfo = await api.analyzeIp(targetToAnalyze, turnstileToken);
       if (ipInfo.status === 'success') {
         return {
           country: ipInfo.country,
@@ -310,19 +313,16 @@ export const ServicesStatusView = () => {
     return undefined;
   };
 
-  const handleAddCustomService = async (targetToUse = customTarget) => {
-    if (!targetToUse) return;
+  const performAddCustomService = async (turnstileToken: string) => {
+    const targetToUse = pendingCustomTarget || customTarget;
 
-    const parsedInterval = Number(customIntervalMinutes);
-    if (!Number.isFinite(parsedInterval) || parsedInterval < 1) {
-      setError('Informe um intervalo válido em minutos para o monitor personalizado.');
-      return;
-    }
+    if (!targetToUse) return;
 
     setIsAddingCustom(true);
     setError(null);
 
     try {
+      const parsedInterval = Number(customIntervalMinutes);
       const checkedAt = Date.now();
       const config: CustomMonitorConfig = {
         id: `custom_monitor_${Date.now()}`,
@@ -333,14 +333,14 @@ export const ServicesStatusView = () => {
         lastCheckedAt: checkedAt,
       };
 
-      const result = await api.checkCustomService(config.target, config.type, config.port, config.id);
+      const result = await api.checkCustomService(config.target, config.type, config.port, config.id, turnstileToken);
       const nextService: ServiceStatus = {
         ...result,
         isCustom: true,
         customIntervalMinutes: config.intervalMinutes,
         lastCheckedAt: checkedAt,
       };
-      const geo = await enrichGeoForTarget(nextService);
+      const geo = await enrichGeoForTarget(nextService, turnstileToken);
       setModalData({ ...nextService, geo });
 
       setCustomMonitors((prev) => persistCustomMonitors([...prev, config]));
@@ -353,6 +353,8 @@ export const ServicesStatusView = () => {
       setCustomTarget('');
       setCustomPort('');
       setCustomIntervalMinutes('5');
+      setPendingCustomTarget(null);
+      setTurnstileOpen(false);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -360,11 +362,24 @@ export const ServicesStatusView = () => {
     }
   };
 
-  const handleServiceClick = async (service: ServiceStatus) => {
-    setModalData({ ...service, geoLoading: true });
-    const geo = await enrichGeoForTarget(service);
-    setModalData((prev) => (prev ? { ...prev, geoLoading: false, geo } : null));
+  const handleAddCustomService = async (targetToUse = customTarget) => {
+    if (!targetToUse) return;
+
+    const parsedInterval = Number(customIntervalMinutes);
+    if (!Number.isFinite(parsedInterval) || parsedInterval < 1) {
+      setError('Informe um intervalo válido em minutos para o monitor personalizado.');
+      return;
+    }
+
+    setError(null);
+    setPendingCustomTarget(targetToUse);
+    setTurnstileOpen(true);
   };
+
+  const handleServiceClick = async (service: ServiceStatus) => {
+    setModalData(service);
+  };
+
 
   const offlineCount = services.filter((service) => service.status === 'offline').length;
   const offlinePercentage = services.length > 0 ? (offlineCount / services.length) * 100 : 0;
@@ -390,11 +405,10 @@ export const ServicesStatusView = () => {
         <div className="flex flex-col space-y-2">
           <h2 className="flex items-center text-2xl font-bold text-slate-900">
             <ActivitySquare className="mr-2 h-6 w-6 text-emerald-600" />
-            Status Global de Serviços
+              Status Global de Serviços
           </h2>
           <p className="text-slate-600">
-            Monitoramento organizado por confiabilidade da fonte. A latência exibida é medida do servidor da API até o alvo monitorado.
-          </p>
+            Monitoramento organizado por confiabilidade da fonte. A latência exibida é medida do servidor da API até o alvo monitorado          </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -411,8 +425,7 @@ export const ServicesStatusView = () => {
 
       <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
         <p className="text-sm text-slate-700">
-          <span className="font-semibold text-slate-900">{watchedServiceIds.length}</span> serviço(s) em alerta. Ao ativar um alerta em um
-          serviço, o navegador pode pedir permissão para enviar notificações de instabilidade, queda e recuperação.
+          <span className="font-semibold text-slate-900">{watchedServiceIds.length}</span> serviço(s) em alerta. Ao ativar um alerta em um serviço, o navegador pode pedir permissão para enviar notificações de instabilidade, queda e recuperação.
         </p>
       </div>
 
@@ -515,6 +528,20 @@ export const ServicesStatusView = () => {
         onDeleteCustom={modalData?.isCustom ? () => removeCustomMonitor(modalData.id) : undefined}
         history={modalData ? historyByService[modalData.id] || [] : []}
       />
+
+      <TurnstileModal
+        open={turnstileOpen}
+        action="service_monitor"
+        title="Validar monitor personalizado"
+        description="Conclua a verificação para criar ou atualizar um monitor personalizado no AinzRoutes."
+        isSubmitting={isAddingCustom}
+        onClose={() => {
+          setTurnstileOpen(false);
+          setPendingCustomTarget(null);
+        }}
+        onConfirm={performAddCustomService}
+      />
+
     </div>
   );
 };

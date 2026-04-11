@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnalysisResults } from '../components/ip-analyzer/AnalysisResults';
 import { SearchForm } from '../components/ip-analyzer/SearchForm';
+import { TurnstileModal } from '../components/security/TurnstileModal';
 import { api } from '../services/api';
 
 interface NetworkInfo {
@@ -21,6 +22,7 @@ export const IpAnalyzerView = () => {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [networkInfo, setNetworkInfo] = useState<NetworkInfo | null>(null);
+  const [turnstileOpen, setTurnstileOpen] = useState(false);
 
   useEffect(() => {
     const fetchMyIp = async () => {
@@ -39,23 +41,31 @@ export const IpAnalyzerView = () => {
     fetchMyIp();
   }, []);
 
-  const handleSearch = async () => {
+  const performSearch = async (turnstileToken: string) => {
     if (!target) return;
+
     setIsSearching(true);
     setError(null);
     setData(null);
 
     try {
-      const result = await api.analyzeIp(target);
+      const result = await api.analyzeIp(target, turnstileToken);
       if (result.status === 'fail') {
         throw new Error(result.message || 'IP ou domínio inválido');
       }
       setData(result);
+      setTurnstileOpen(false);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleSearch = async () => {
+    if (!target) return;
+    setError(null);
+    setTurnstileOpen(true);
   };
 
   return (
@@ -95,6 +105,16 @@ export const IpAnalyzerView = () => {
       {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div> : null}
 
       <AnalysisResults isSearching={isSearching} data={data} />
+
+      <TurnstileModal
+        open={turnstileOpen}
+        action="ip_analyzer"
+        title="Validar consulta do Raio-X"
+        description="Conclua a verificação para consultar IPs e domínios no Raio-X do AinzRoutes."
+        isSubmitting={isSearching}
+        onClose={() => setTurnstileOpen(false)}
+        onConfirm={performSearch}
+      />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Lock, Shield } from 'lucide-react';
+import { TurnstileModal } from '../components/security/TurnstileModal';
 import { TargetInput } from '../components/scanner/TargetInput';
 import { api } from '../services/api';
 
@@ -9,6 +10,7 @@ export const PortScannerView = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [scanData, setScanData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileOpen, setTurnstileOpen] = useState(false);
 
   useEffect(() => {
     const fetchMyIp = async () => {
@@ -31,20 +33,27 @@ export const PortScannerView = () => {
       .map((value) => Number.parseInt(value.trim(), 10))
       .filter((value) => Number.isInteger(value) && value >= 1 && value <= 65535);
 
-  const handleScan = async () => {
+  const performScan = async (turnstileToken: string) => {
     if (!target) return;
     setIsScanning(true);
     setError(null);
     setScanData(null);
 
     try {
-      const data = await api.scanTarget(target, parseCustomPorts());
+      const data = await api.scanTarget(target, parseCustomPorts(), turnstileToken);
       setScanData(data);
+      setTurnstileOpen(false);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setIsScanning(false);
     }
+  };
+
+  const handleScan = async () => {
+    if (!target) return;
+    setError(null);
+    setTurnstileOpen(true);
   };
 
   return (
@@ -102,6 +111,16 @@ export const PortScannerView = () => {
           )}
         </div>
       </div>
+
+      <TurnstileModal
+        open={turnstileOpen}
+        action="port_scanner"
+        title="Validar varredura de portas"
+        description="Conclua a verificação para iniciar uma nova varredura no scanner de portas."
+        isSubmitting={isScanning}
+        onClose={() => setTurnstileOpen(false)}
+        onConfirm={performScan}
+      />
     </div>
   );
 };
